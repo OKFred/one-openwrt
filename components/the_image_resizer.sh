@@ -51,7 +51,8 @@ the_image_resizer() {
     cat $temp_grub_file
     echo "______________________________"
     echo "⚠️旧的引导文件内容👆"
-    sed "s/PARTUUID=[a-z0-9-]*/PARTUUID=$new_partuuid/g" $temp_grub_file > $temp_grub_file
+    local new_content=$(sed "s/PARTUUID=[a-z0-9-]*/PARTUUID=$new_partuuid/g" $temp_grub_file)
+    echo $new_content >$temp_grub_file
 
     cat $temp_grub_file
     echo "______________________________"
