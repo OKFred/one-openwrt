@@ -43,17 +43,17 @@ the_image_resizer() {
     mount $img_mount_path"p1" esp
     ls -la esp
     echo "观察PARTUUID，两个都复制出来，和GRUB文件里的比较"
+    local temp_grub_file=./esp/boot/grub/grub.cfg
     blkid
-    local old_partuuid=$(cat ./esp/boot/grub/grub.cfg | grep PARTUUID | awk -F= '{print $2}' | awk -F\" '{print $2}')
-    echo "旧的PARTUUID是："$old_partuuid
-    local new_partuuid=$(blkid | grep $img_mount_path"p2" | awk -F\" '{print $2}')
+    local new_partuuid=$(blkid | grep rootfs | awk '{print $6}' | awk -F\" '{print $2}')
     echo "新的PARTUUID是："$new_partuuid
     echo "GRUB文件里错误的ID数字是紧接着第一分区的，需要调整"
-    cat ./esp/boot/grub/grub.cfg
+    cat $temp_grub_file
     echo "______________________________"
     echo "⚠️旧的引导文件内容👆"
-    sed -i "s/$old_partuuid/$new_partuuid/g" ./esp/boot/grub/grub.cfg
-    cat ./esp/boot/grub/grub.cfg
+    sed "s/PARTUUID=[a-z0-9-]*/PARTUUID=$new_partuuid/g" $temp_grub_file > $temp_grub_file
+
+    cat $temp_grub_file
     echo "______________________________"
     echo "✅新的引导文件内容👆"
     umount $img_mount_path"p1"
