@@ -8,15 +8,15 @@
 #none
 
 the_image_resizer() {
-  local image_file=$1
-  echo "先将原版的"$image_file"解压"
-  gzip -d $image_file
+  local img_file=$1
+  echo "先将原版的"$img_file"解压"
+  gzip -d $img_file
   echo "然后扩容至约1.9G"
-  dd if=/dev/zero bs=4096k count=512 >>op.img
+  dd if=/dev/zero bs=4096k count=512 >>$img_file
   echo "观察文件大小是否变化"
   ls -lh
   echo "挂载到系统"
-  losetup -f op.img
+  losetup -f $img_file
   losetup
   lsblk
   return 0;
