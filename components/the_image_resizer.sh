@@ -20,22 +20,35 @@ the_image_resizer() {
   echo "挂载到系统"
   losetup -f $img_file
   losetup
-
   echo "使用分区助手，重建需要扩容的分区"
   local img_mount_path=$(losetup -a | grep op.img | awk -F: '{print $1}')
-  fdisk $img_mount_path
+  fdisk -l $img_mount_path
+
+  # 获取第一个分区结束扇区
+  local end_sector=$(sudo fdisk -l $img_mount_path | grep "^"$img_mount_path"p1" | awk '{print $3}')
+
+  # 计算第二分区的起始扇区（结束扇区 + 1）
+  local start_sector=$((end_sector + 1))
+
+  # 打印起始扇区
+  echo "第二扇区起始值"$start_sector
+
+  # fdisk $img_mount_path
+  echo -e "p\nd\n2\nn\n2\n$start_sector\n\nw" | fdisk /dev/loop0
 
   echo "更新分区信息"
   partx -u $img_mount_path
   lsblk
   echo "检查错误"
-  e2fsck -f $img_mount_path"p2"
+  echo -e "y\n" | e2fsck -f $img_mount_path"p2"
   echo "完成扩容"
   resize2fs $img_mount_path"p2"
   lsblk
 
-  echo "是否为UEFI启动镜像？ [y/n]"
-  read is_uefi
+  # echo "是否为UEFI启动镜像？ [y/n]"
+  # read is_uefi
+  echo "默认为UEFI启动镜像，调整引导信息"
+  local is_uefi="y"
   if [ $is_uefi == "y" ]; then
     echo "UEFI启动的还需要编辑grub，因为PARTUUID分区后改变了"
     echo "建一个空目录"
@@ -51,7 +64,7 @@ the_image_resizer() {
     cat $temp_grub_file
     echo "______________________________"
     echo "⚠️旧的引导文件内容👆"
-    sed "s/PARTUUID=[a-z0-9-]*/PARTUUID=$new_partuuid/g" $temp_grub_file > grub.cfg.new
+    sed "s/PARTUUID=[a-z0-9-]*/PARTUUID=$new_partuuid/g" $temp_grub_file >grub.cfg.new
     mv grub.cfg.new $temp_grub_file
 
     cat $temp_grub_file
