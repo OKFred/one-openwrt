@@ -51,8 +51,8 @@ the_image_resizer() {
     cat $temp_grub_file
     echo "______________________________"
     echo "⚠️旧的引导文件内容👆"
-    local new_content=$(sed "s/PARTUUID=[a-z0-9-]*/PARTUUID=$new_partuuid/g" $temp_grub_file)
-    echo $new_content >$temp_grub_file
+    sed "s/PARTUUID=[a-z0-9-]*/PARTUUID=$new_partuuid/g" $temp_grub_file > grub.cfg.new
+    mv grub.cfg.new $temp_grub_file
 
     cat $temp_grub_file
     echo "______________________________"
