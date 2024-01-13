@@ -1,8 +1,8 @@
-### @description: 用于 Ubuntu/Debian 服务器初始化
+### @description: 用于 openwrt 固件的自动下载、解压、扩容、打包
 
 ### @author: Fred Zhang Qi
 
-### @datetime: 2023-12-16
+### @datetime: 2024-01-13
 
 ## 运行方法
 
