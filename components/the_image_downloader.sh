@@ -15,7 +15,7 @@ the_image_downloader() {
     save_as="op.img.gz"
   fi
   echo "下载固件："
-  echo "wget $image_url -O $save_as"
+  wget $image_url -O $save_as
   echo "文件信息："
   ls -lh $save_as
 }
