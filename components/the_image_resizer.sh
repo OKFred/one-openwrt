@@ -15,7 +15,7 @@ the_image_resizer() {
   echo "然后扩容至约1.9G"
   dd if=/dev/zero bs=4096k count=512 >>$img_file
   echo "观察文件大小是否变化"
-  ls -lh
+  ls -lh $img_file
 
   echo "挂载到系统"
   losetup -f $img_file
