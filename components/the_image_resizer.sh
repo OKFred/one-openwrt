@@ -24,11 +24,8 @@ the_image_resizer() {
   local img_mount_path=$(losetup -a | grep op.img | awk -F: '{print $1}')
   fdisk -l $img_mount_path
 
-  # 获取第一个分区结束扇区
-  local end_sector=$(sudo fdisk -l $img_mount_path | grep "^"$img_mount_path"p1" | awk '{print $3}')
-
-  # 计算第二分区的起始扇区（结束扇区 + 1）
-  local start_sector=$((end_sector + 1))
+  # 记录第二分区的起始扇区
+  local start_sector=$(fdisk -l /dev/loop0 | grep p2 | awk '{print $2}')
 
   # 打印起始扇区
   echo "第二扇区起始值"$start_sector
