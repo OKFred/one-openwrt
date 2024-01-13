@@ -9,27 +9,54 @@
 
 the_image_resizer() {
   local img_file=$1
+
   echo "先将原版的"$img_file"解压"
   gzip -d $img_file
   echo "然后扩容至约1.9G"
   dd if=/dev/zero bs=4096k count=512 >>$img_file
   echo "观察文件大小是否变化"
   ls -lh
+
   echo "挂载到系统"
   losetup -f $img_file
   losetup
-  lsblk
-  return 0;
+
   echo "使用分区助手，重建需要扩容的分区"
-  fdisk /dev/loop0
+  local img_mount_path=$(losetup -a | grep op.img | awk -F: '{print $1}')
+  fdisk $img_mount_path
+
   echo "更新分区信息"
-  partx -u /dev/loop0
+  partx -u $img_mount_path
   lsblk
   echo "检查错误"
-  e2fsck -f /dev/loop0p2
+  e2fsck -f $img_mount_path"p2"
   echo "完成扩容"
-  resize2fs /dev/loop0p2
+  resize2fs $img_mount_path"p2"
+  lsblk
 
-  ##
-  echo "自行检查是否为UEFI启动镜像👇"
+  echo "是否为UEFI启动镜像？ [y/n]"
+  read is_uefi
+  if [ $is_uefi == "y" ]; then
+    echo "UEFI启动的还需要编辑grub，因为PARTUUID分区后改变了"
+    echo "建一个空目录"
+    mkdir esp
+    mount $img_mount_path"p1" esp
+    ls -la esp
+    echo "观察PARTUUID，两个都复制出来，和GRUB文件里的比较"
+    blkid
+
+    # 编辑grub.cfg文件
+    echo "GRUB文件里错误的ID数字是紧接着第一分区的，需要调整"
+    nano ./esp/boot/grub/grub.cfg
+    echo "编辑完后卸载，继续之前的操作"
+    umount $img_mount_path"p1"
+    rm -rf esp
+  fi
+
+  partx -d $img_mount_path
+  losetup -d $img_mount_path
+  lsblk
+  gzip op.img
+  ls -lh
+  echo "完成。请手动拷贝文件op.img.gz"
 }
