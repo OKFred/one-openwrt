@@ -2,14 +2,14 @@ name: sync-images
 
 on:
     push:
-    # 设置定时任务，每 8 小时运行一次
+    # 设置定时任务，每 31 天运行一次
     schedule:
-        - cron: "0 0 */8 * *"
+        - cron: "0 0 */31 * *"
 
 jobs:
     job1:
         runs-on: ubuntu-latest
-        env:
+        # env:
         steps:
             - name: Clone repository
               uses: actions/checkout@v4
