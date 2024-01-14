@@ -76,5 +76,5 @@ the_image_resizer() {
   lsblk
   gzip op.img
   ls -lh
-  echo "完成。请手动拷贝文件op.img.gz"
+  echo "完成。请手动获取op.img.gz"
 }
