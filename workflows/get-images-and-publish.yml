@@ -1,0 +1,26 @@
+name: sync-images
+
+on:
+    push:
+    # 设置定时任务，每 8 小时运行一次
+    schedule:
+        - cron: "0 0 */8 * *"
+
+jobs:
+    job1:
+        runs-on: ubuntu-latest
+        env:
+        steps:
+            - name: Clone repository
+              uses: actions/checkout@v4
+            - name: get images and publish 🚩获取镜像，自动扩容并发布
+              shell: bash
+              run: |
+                  date
+                  echo 'hello there! Ready to make new images--准备自动扩容镜像'
+                  source ./index.sh
+            - name: "⏫上传制品"
+              uses: actions/upload-artifact@v4
+              with:
+                  name: 扩容后的openwrt
+                  path: op.img.gz
