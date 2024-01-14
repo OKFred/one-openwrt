@@ -1,4 +1,4 @@
-name: sync-images
+name: get-images-and-publish
 
 on:
     push:
