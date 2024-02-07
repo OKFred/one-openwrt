@@ -4,10 +4,18 @@ coreutils-nohup
 curl
 dns2socks
 dns2tcp
+dnsmasq-full
 haproxy
 ip-full
+iptables
+iptables-mod-conntrack-extra
+iptables-mod-socket
 kmod-cryptodev
 kmod-crypto-user
+kmod-nft-socket
+kmod-nft-tproxy
+kmod-nft-nat
+libstdcpp6
 lua
 luci-app-frpc
 luci-app-ser2net
@@ -17,5 +25,6 @@ luci-compat
 luci-i18n-base-zh-cn
 luci-lib-jsonc
 resolveip
+sing-box
 tcping
 unzip
