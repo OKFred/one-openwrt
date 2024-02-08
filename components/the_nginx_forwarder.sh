@@ -115,8 +115,9 @@ the_port_checker() {
     fi #如果文件不是以.conf结尾，则跳过
     nginx_port=$(cat $the_nginx_conf_dir/$file | grep "listen" | awk '{print $2}' | awk -F ";" '{print $1}')
     if [ $this_port -eq $nginx_port ]; then
-      #echo "端口：$this_port 已被占用"
-      exit 1
+      echo "端口：$this_port 已被占用"
+      # exit 1
     fi
   done
+  return 0
 }
