@@ -60,12 +60,6 @@ the_nginx_forwarder() {
 	# 网站主页
 	index index.html index.htm index.php;
 
-    #禁止访问DOTFILES
-    location ~ /\\. {
-        deny all;
-    }
-
-	 # minio对象存储
 	 location / {
 			proxy_set_header X-Real-IP \$remote_addr;
 			proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -99,6 +93,7 @@ the_environment_checker() {
     echo "nginx配置目录不存在"
     exit 1
   fi
+  echo "nginx命令以及配置目录存在"
 }
 
 the_port_checker() {
