@@ -22,24 +22,7 @@ the_nginx_forwarder() {
   echo "🚩upstream--请输入后端服务地址"
   read upstream
   echo -e "\033[0m"
-  the_port_checker $port
-}
-
-the_environment_checker() {
-  #检查nginx命令以及配置目录是否存在
-  if [ -z "$(which nginx)" ]; then
-    echo "nginx命令不存在"
-    exit 1
-  fi
-  if [ ! -d $the_nginx_conf_dir ]; then
-    echo "nginx配置目录不存在"
-    exit 1
-  fi
-  echo "nginx命令以及配置目录存在"
-}
-
-the_port_checker() {
-  local this_port=$1
+  local this_port=$port
   if [ -z "$(netstat -tunlp | grep $this_port)" ]; then
     # echo "端口：$this_port 未被占用"
   else
@@ -57,4 +40,17 @@ the_port_checker() {
       exit 1
     fi
   done
+}
+
+the_environment_checker() {
+  #检查nginx命令以及配置目录是否存在
+  if [ -z "$(which nginx)" ]; then
+    echo "nginx命令不存在"
+    exit 1
+  fi
+  if [ ! -d $the_nginx_conf_dir ]; then
+    echo "nginx配置目录不存在"
+    exit 1
+  fi
+  echo "nginx命令以及配置目录存在"
 }
