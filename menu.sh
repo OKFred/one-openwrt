@@ -8,6 +8,7 @@
 source ./components/the_nginx_installer.sh
 source ./components/the_nginx_forwarder.sh
 source ./components/the_nginx_restarter.sh
+source ./components/the_nginx_port_cleaner.sh
 
 menu_title() {
   #clear
@@ -29,6 +30,7 @@ main() {
     echo "01. nginx installer--安装配置nginx"
     echo "02. nginx forwarder--配置nginx转发"
     echo "03. nginx restarter--重启nginx"
+    echo "04. nginx port cleaner--清理nginx端口"
     echo "09. about--关于"
     echo "00. exit--退出"
     echo
@@ -38,6 +40,7 @@ main() {
     01 | 1) the_nginx_installer ;;
     02 | 2) the_nginx_forwarder ;;
     03 | 3) the_nginx_restarter ;;
+    04 | 4) the_nginx_port_cleaner ;;
     09 | 9) nano readme.md ;;
     00 | 0) exit 1 ;;
     u) echo "???" ;;
