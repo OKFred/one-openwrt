@@ -21,6 +21,8 @@ the_nginx_forwarder() {
   read port
   echo "🚩upstream--请输入后端服务地址"
   read upstream
+  echo "🚩remark--请输入备注"
+  read remark
   echo -e "\033[0m"
   the_port_checker $port
   if [ $? -ne 0 ]; then
@@ -74,6 +76,7 @@ wwwroot=$wwwroot
 	# 网站主页
 	index index.html index.htm index.php;
 
+  # 转发服务备注：$remark
 	 location / {
 			proxy_set_header X-Real-IP \$remote_addr;
 			proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -112,7 +115,6 @@ the_environment_checker() {
     echo "nginx配置目录不存在"
     exit 1
   fi
-  echo "nginx命令以及配置目录存在"
 }
 
 the_port_checker() {
