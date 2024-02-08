@@ -19,7 +19,7 @@ main() {
   local image_url="https://downloads.openwrt.org/releases/$latest_version/targets/x86/64/openwrt-$latest_version-x86-64-generic-ext4-combined-efi.img.gz"
   local save_as="op.img.gz"
   the_image_downloader $image_url $save_as
-  the_image_resizer "op.img"
+  the_image_resizer $save_as
 
   echo "done--大功告成"
   echo -e "\033[0m"

@@ -9,16 +9,13 @@
 
 the_image_resizer() {
   local img_file=$1
-  cp $img_file /mnt/$img_file
-  cd /mnt
-  pwd
   echo "先将原版的"$img_file"解压"
-  df -h
-  gzip -d -v $img_file
+  gzip -d $img_file
   echo "然后扩容至约512M"
   img_file=${img_file%.*} #去掉后缀
-  ls -lh $img_file
-  dd if=/dev/zero bs=4096k count=64 >>$img_file
+  df -h
+  dd if=/dev/zero bs=4096k count=128 >>$img_file
+  df -h
   echo "观察文件大小是否变化"
   ls -lh $img_file
 
