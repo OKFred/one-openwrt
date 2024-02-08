@@ -1,4 +1,11 @@
 #!/bin/bash
+#@description: 快速配置nginx端口转发
+#@author: Fred Zhang Qi
+#@datetime: 2024-02-01
+
+#文件依赖
+#⚠️import--需要引入包含函数的文件
+#none
 
 the_nginx_env="/etc/nginx/.env"
 the_nginx_conf_dir="/etc/nginx/conf.d"
@@ -27,54 +34,14 @@ the_nginx_forwarder() {
   echo "当前变量："
   echo "server_name=$server_name"
   echo "wwwroot=$wwwroot"
-  echo "server {
+  echo "server \{
 	# 域名	
 	server_name $server_name;
 	
 	# 端口
 	listen $port ssl http2;
-	
-	#证书文件
-	ssl_certificate /etc/ssl/certs/$server_name.crt; 
-
-	#私钥文件
-	ssl_certificate_key /etc/ssl/keys/$server_name.key; 
-	ssl_session_timeout 5m;
-
-	#加密协议
-	ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
-
-	#加密套件
-	ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:HIGH:!aNULL:!MD5:!RC4:!DHE; 
-	ssl_prefer_server_ciphers on;
-
-	# 网站目录
-	root $wwwroot;
-
-	# 网站主页
-	index index.html index.htm index.php;
-
-	 location / {
-			proxy_set_header X-Real-IP \$remote_addr;
-			proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-			proxy_set_header Host \$http_host;
-			proxy_set_header X-NginX-Proxy true;
-			proxy_set_header  X-Forwarded-Proto \$scheme;
-			proxy_pass $upstream;
-			proxy_redirect off;
-
-			#WebSocket设置
-			 proxy_read_timeout 300s;
-			 proxy_send_timeout 300s;
-
-			 proxy_http_version 1.1;
-			 proxy_set_header Upgrade \$http_upgrade;
-			 proxy_set_header Connection \$connection_upgrade;
-	 }
-
-	#  隐藏nginx版本号
 	server_tokens off;
-}" >$the_nginx_conf_dir/$port.conf
+\}" >$the_nginx_conf_dir/$port.conf
 }
 
 the_environment_checker() {
