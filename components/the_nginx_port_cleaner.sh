@@ -29,6 +29,11 @@ the_nginx_port_cleaner() {
   rm -f $the_nginx_conf_dir/$port.conf
   echo "端口：$port 已清理"
   ls -la $the_nginx_conf_dir
+  read -p "是否重启nginx？(y/n)" the_user_choice
+  if [ "$the_user_choice" == "y" ]; then
+    nginx -s reload
+    echo "nginx已重启"
+  fi
   return 0
 }
 
