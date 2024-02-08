@@ -21,6 +21,7 @@ the_nginx_forwarder() {
   read port
   echo "🚩upstream--请输入后端服务地址"
   read upstream
+  echo -e "\033[0m"
   the_port_checker $port
   if [ $? -ne 0 ]; then
     echo "端口：$port 已被占用"
@@ -33,14 +34,6 @@ the_nginx_forwarder() {
   echo "当前变量："
   echo "server_name=$server_name"
   echo "wwwroot=$wwwroot"
-  echo "server \{
-	# 域名	
-	server_name $server_name;
-	
-	# 端口
-	listen $port ssl http2;
-	server_tokens off;
-\}" >$the_nginx_conf_dir/$port.conf
 }
 
 the_environment_checker() {
