@@ -1,11 +1,4 @@
 #!/bin/bash
-#@description: 快速配置nginx端口转发
-#@author: Fred Zhang Qi
-#@datetime: 2024-02-01
-
-#文件依赖
-#⚠️import--需要引入包含函数的文件
-#none
 
 the_nginx_env="/etc/nginx/.env"
 the_nginx_conf_dir="/etc/nginx/conf.d"
@@ -24,6 +17,7 @@ the_nginx_forwarder() {
   echo -e "\033[0m"
   the_port_checker $port
   if [ $? -ne 0 ]; then
+    echo "端口：$port 已被占用"
     exit 1
   fi
   #从env中读取server_name，wwwroot
