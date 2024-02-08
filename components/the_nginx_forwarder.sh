@@ -32,12 +32,16 @@ the_nginx_forwarder() {
   #   wwwroot=/var/www/html
   if [ ! -f $the_nginx_env ]; then
     echo "nginx环境变量文件不存在"
-    #手动输入变量
+    #手动输入变量，写入.env
     echo -e "\033[33m"
     echo "🚩server_name--请输入域名，如abc.example.com"
     read server_name
     echo "www root--请输入默认网站根目录"
     read wwwroot
+    echo -e "\033[0m"
+    echo "server_name=$server_name
+wwwroot=$wwwroot
+" >$the_nginx_env
   fi
   source $the_nginx_env
   echo "当前变量："
@@ -91,6 +95,11 @@ the_nginx_forwarder() {
 	#  隐藏nginx版本号
 	server_tokens off;
 }" >$the_nginx_conf_dir/$port.conf
+  echo "配置文件已生成，重启nginx后生效"
+  read -p "是否重启nginx？(y/n)" check_nginx
+  if [ "$check_nginx" == "y" ]; then
+    nginx -s reload
+  fi
 }
 
 the_environment_checker() {
