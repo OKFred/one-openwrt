@@ -15,7 +15,7 @@ the_image_resizer() {
   cd /run/user/1001
   ls -la
   echo "先将原版的"$img_file"解压"
-  gzip -d -v $img_file
+  gzip -d -k -v $img_file
   echo "然后扩容至约512M"
   img_file=${img_file%.*} #去掉后缀
   dd if=/dev/zero bs=4096k count=128 >>$img_file
