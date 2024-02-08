@@ -108,12 +108,6 @@ the_environment_checker() {
 
 the_port_checker() {
   this_port=$1
-  #检查端口是否被占用
-  netstat -tunlp | grep $this_port
-  if [ $? -eq 0 ]; then
-    #echo "端口：$this_port 已被占用"
-    exit 1
-  fi
   #遍历conf.d目录下的配置文件，了解端口占用情况
   for file in $(ls $the_nginx_conf_dir); do
     if [ "${file##*.}" != "conf" ]; then
