@@ -9,10 +9,10 @@
 
 the_image_resizer() {
   local img_file=$1
-  df -h
-  cp $img_file /mnt/$img_file
-  cd /mnt
   pwd
+  df -h
+  cp $img_file /run/user/1001/$img_file
+  cd /run/user/1001
   ls -la
   echo "先将原版的"$img_file"解压"
   gzip -d -v $img_file
