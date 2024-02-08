@@ -118,6 +118,7 @@ the_environment_checker() {
 the_port_checker() {
   this_port=$1
   #遍历conf.d目录下的配置文件，了解端口占用情况
+  ls -la $the_nginx_conf_dir
   for file in $(ls $the_nginx_conf_dir); do
     if [ "${file##*.}" != "conf" ]; then
       continue
@@ -125,7 +126,7 @@ the_port_checker() {
     nginx_port=$(cat $the_nginx_conf_dir/$file | grep "listen" | awk '{print $2}' | awk -F ";" '{print $1}')
     if [ $this_port -eq $nginx_port ]; then
       echo "端口：$this_port 已被占用"
-      # exit 1
+      exit 1
     fi
   done
   return 0
