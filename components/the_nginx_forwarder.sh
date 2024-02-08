@@ -10,27 +10,6 @@
 the_nginx_env="/etc/nginx/.env"
 the_nginx_conf_dir="/etc/nginx/conf.d"
 
-the_port_checker() {
-  this_port=$1
-  if [ -z "$(netstat -tunlp | grep $this_port)" ]; then
-    # echo "端口：$this_port 未被占用"
-  else
-    #echo "端口：$this_port 已被占用"
-    exit 1
-  fi
-  #遍历conf.d目录下的配置文件，了解端口占用情况
-  for file in $(ls $the_nginx_conf_dir); do
-    if [ "${file##*.}" != "conf" ]; then
-      continue
-    fi #如果文件不是以.conf结尾，则跳过
-    nginx_port=$(cat $the_nginx_conf_dir/$file | grep "listen" | awk '{print $2}' | awk -F ";" '{print $1}')
-    if [ $this_port -eq $nginx_port ]; then
-      #echo "端口：$this_port 已被占用"
-      exit 1
-    fi
-  done
-}
-
 the_nginx_forwarder() {
   the_environment_checker
   if [ $? -ne 0 ]; then
@@ -82,7 +61,7 @@ the_nginx_forwarder() {
 	index index.html index.htm index.php;
 
     #禁止访问DOTFILES
-    location ~ /\. {
+    location ~ /\\. {
         deny all;
     }
 
@@ -120,4 +99,25 @@ the_environment_checker() {
     echo "nginx配置目录不存在"
     exit 1
   fi
+}
+
+the_port_checker() {
+  this_port=$1
+  if [ -z "$(netstat -tunlp | grep $this_port)" ]; then
+    # echo "端口：$this_port 未被占用"
+  else
+    #echo "端口：$this_port 已被占用"
+    exit 1
+  fi
+  #遍历conf.d目录下的配置文件，了解端口占用情况
+  for file in $(ls $the_nginx_conf_dir); do
+    if [ "${file##*.}" != "conf" ]; then
+      continue
+    fi #如果文件不是以.conf结尾，则跳过
+    nginx_port=$(cat $the_nginx_conf_dir/$file | grep "listen" | awk '{print $2}' | awk -F ";" '{print $1}')
+    if [ $this_port -eq $nginx_port ]; then
+      #echo "端口：$this_port 已被占用"
+      exit 1
+    fi
+  done
 }

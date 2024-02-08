@@ -28,6 +28,7 @@ main() {
     menu_title
     echo "01. nginx installer--安装配置nginx"
     echo "02. nginx forwarder--配置nginx转发"
+    echo "03. nginx restarter--重启nginx"
     echo "09. about--关于"
     echo "00. exit--退出"
     echo
