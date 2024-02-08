@@ -23,17 +23,6 @@ the_nginx_forwarder() {
   read upstream
   echo -e "\033[0m"
   the_port_checker $port
-  if [ $? -ne 0 ]; then
-    echo "端口：$port 已被占用"
-    exit 1
-  fi
-  #从env中读取server_name，wwwroot
-  #例 server_name=www.example.com
-  #   wwwroot=/var/www/html
-  source $the_nginx_env
-  echo "当前变量："
-  echo "server_name=$server_name"
-  echo "wwwroot=$wwwroot"
 }
 
 the_environment_checker() {
@@ -50,7 +39,7 @@ the_environment_checker() {
 }
 
 the_port_checker() {
-  this_port=$1
+  local this_port=$1
   if [ -z "$(netstat -tunlp | grep $this_port)" ]; then
     # echo "端口：$this_port 未被占用"
   else
