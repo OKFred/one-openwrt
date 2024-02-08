@@ -1,3 +1,4 @@
+bash
 coreutils
 coreutils-base64
 coreutils-nohup
