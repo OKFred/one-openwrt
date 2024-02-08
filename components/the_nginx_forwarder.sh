@@ -30,6 +30,15 @@ the_nginx_forwarder() {
   #从env中读取server_name，wwwroot
   #例 server_name=www.example.com
   #   wwwroot=/var/www/html
+  if [ ! -f $the_nginx_env ]; then
+    echo "nginx环境变量文件不存在"
+    #手动输入变量
+    echo -e "\033[33m"
+    echo "🚩server_name--请输入域名，如abc.example.com"
+    read server_name
+    echo "www root--请输入默认网站根目录"
+    read wwwroot
+  fi
   source $the_nginx_env
   echo "当前变量："
   echo "server_name=$server_name"
@@ -99,6 +108,12 @@ the_environment_checker() {
 
 the_port_checker() {
   this_port=$1
+  #检查端口是否被占用
+  netstat -tunlp | grep $this_port
+  if [ $? -eq 0 ]; then
+    #echo "端口：$this_port 已被占用"
+    exit 1
+  fi
   #遍历conf.d目录下的配置文件，了解端口占用情况
   for file in $(ls $the_nginx_conf_dir); do
     if [ "${file##*.}" != "conf" ]; then
