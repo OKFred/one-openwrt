@@ -21,7 +21,6 @@ the_nginx_forwarder() {
   read port
   echo "🚩upstream--请输入后端服务地址"
   read upstream
-  echo -e "\033[0m"
   the_port_checker $port
   if [ $? -ne 0 ]; then
     echo "端口：$port 已被占用"
