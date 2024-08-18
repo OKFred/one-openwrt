@@ -1,14 +1,5 @@
-#添加一个新的端口转发规则，以及更改系统设置
-uci add firewall redirect
-uci set firewall.@redirect[-1].name='luci-management-from-wan'
-uci set firewall.@redirect[-1].src='wan'
-uci set firewall.@redirect[-1].dest='lan'
-uci set firewall.@redirect[-1].proto='tcp'
-uci set firewall.@redirect[-1].dest_ip='192.168.1.1'
-uci set firewall.@redirect[-1].dest_port='8888'
-uci set firewall.@redirect[-1].src_dport='80'
-
-uci set system.@system[0].hostname='my-op'
 uci set system.@system[0].timezone='CST-8'
 uci set system.@system[0].zonename='Asia/Shanghai'
+uci set firewall.@zone[1].input='ACCEPT'
+uci set firewall.@zone[1].forward='ACCEPT'
 uci commit firewall
