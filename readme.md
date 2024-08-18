@@ -6,7 +6,7 @@
 
 ## 运行方法
 
-`cd $HOME/one-openwrt && chmod +x index.sh && ./index.sh`
+`cd $HOME/one-openwrt && git reset --hard HEAD && git pull && chmod +x index.sh && ./index.sh`
 
 ## 说明
 
