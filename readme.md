@@ -8,6 +8,12 @@
 
 `cd $HOME/one-openwrt && git reset --hard HEAD && git pull && chmod +x index.sh && ./index.sh`
 
+## 在 virtualBox 中运行
+
+需要转换虚拟磁盘
+`cd "C:\Program Files\Oracle\VirtualBox"`
+`.\VBoxManage convertfromraw /path/to/your/op.img /path/to/your/op.vmdk --format VMDK`
+
 ## 说明
 
 本想使用 Github Actions 定期自动运行，但是免费版本容量只有 500MB。  
