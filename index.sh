@@ -16,6 +16,7 @@ main() {
   echo -e "script running....开始运行\033[0m"
   local save_as="op.img.gz"
   if [ -f $save_as ]; then
+    ls -la $save_as
     echo "文件已存在，是否重新下载？"
     read -p "请输入：y/n：" need_download
     if [ $need_download == 'y' ]; then
@@ -23,8 +24,8 @@ main() {
     else
       echo "使用已存在的$save_as"
     fi
-    else
-      download $save_as
+  else
+    download $save_as
   fi
   the_image_resizer $save_as
 
@@ -32,7 +33,7 @@ main() {
   echo -e "\033[0m"
 }
 
-download(){
+download() {
   local save_as=$1
   echo "开始下载"
   local latest_version=$(the_image_version_getter)
