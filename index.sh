@@ -14,32 +14,15 @@ main() {
   date
   echo "执行需要管理员权限。请注意"
   echo -e "script running....开始运行\033[0m"
+  local latest_version=$(the_image_version_getter)
+  echo "最新版本是：$latest_version"
+  local image_url="https://downloads.openwrt.org/releases/$latest_version/targets/x86/64/openwrt-$latest_version-x86-64-generic-ext4-combined-efi.img.gz"
   local save_as="op.img.gz"
-  if [ -f $save_as ]; then
-    ls -la $save_as
-    echo "文件已存在，是否重新下载？"
-    read -p "请输入：y/n：" need_download
-    if [ $need_download == 'y' ]; then
-      download $save_as
-    else
-      echo "使用已存在的$save_as"
-    fi
-  else
-    download $save_as
-  fi
+  the_image_downloader $image_url $save_as
   the_image_resizer $save_as
 
   echo "done--大功告成"
   echo -e "\033[0m"
-}
-
-download() {
-  local save_as=$1
-  echo "开始下载"
-  local latest_version=$(the_image_version_getter)
-  echo "最新版本是：$latest_version"
-  local image_url="https://downloads.openwrt.org/releases/$latest_version/targets/x86/64/openwrt-$latest_version-x86-64-generic-ext4-combined-efi.img.gz"
-  the_image_downloader $image_url $save_as
 }
 
 main
