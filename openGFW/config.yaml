@@ -1,0 +1,18 @@
+io:
+  queueSize: 1024
+  rcvBuf: 4194304
+  sndBuf: 4194304
+  local: false # 如果需要在 FORWARD 链上运行 OpenGFW，请设置为 false
+
+workers:
+  count: 4
+  queueSize: 16
+  tcpMaxBufferedPagesTotal: 4096
+  tcpMaxBufferedPagesPerConn: 64
+  udpMaxStreams: 4096
+
+# 指定的 geoip/geosite 档案路径
+# 如果未设置，将自动从 https://github.com/Loyalsoldier 下载
+#geo:
+#  geoip: /usr/share/geoip.dat
+#  geosite: /usr/share/geosite.dat

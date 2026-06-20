@@ -1,0 +1,41 @@
+- name: log horny people
+  log: true
+  expr: let sni = string(tls?.req?.sni); sni contains "porn" || sni contains "hentai"
+
+- name: block weibo http
+  action: block
+  expr: string(http?.req?.headers?.host) endsWith "weibo.com"
+
+- name: block weibo https
+  action: block
+  expr: string(tls?.req?.sni) endsWith "weibo.com"
+
+- name: block weibo quic
+  action: block
+  expr: string(quic?.req?.sni) endsWith "weibo.com"
+
+- name: block weibo socks
+  action: block
+  expr: string(socks?.req?.addr) endsWith "weibo.com" && socks?.req?.port == 80
+
+- name: block bilibili geosite
+  action: block
+  expr: geosite(string(tls?.req?.sni), "bilibili")
+
+- name: zhihu dns poisoning
+  action: modify
+  modifier:
+    name: dns
+    args:
+      a: "1.1.1.1"
+  expr: dns != nil && dns.qr && any(dns.questions, {.name endsWith "zhihu.com"})
+
+- name: block and log shadowsocks
+  action: block
+  log: true
+  expr: fet != nil && fet.yes
+
+- name: block trojan
+  action: block
+  log: true
+  expr: trojan != nil && trojan.yes
