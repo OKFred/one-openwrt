@@ -7,12 +7,55 @@ PID_FILE="openGFW.pid"
 UPLOAD_PID_FILE="upload.pid"
 LOG_FILE="openGFW.log"
 
-# Upload settings. Override them with environment variables if needed.
-LOG_URL="${LOG_URL:-http://127.0.0.1:8787/firewall/logs}"
-DEVICE_ID="${DEVICE_ID:-1}"
-TRAFFIC_METHOD="${TRAFFIC_METHOD:-${DEVICE_LOCATION:-direct}}"
-AUTH_TOKEN="${AUTH_TOKEN:-abc123}"
-DEBUG="${DEBUG:-0}"
+# Load .env file from the same directory if it exists. (.env overrides existing environment variables)
+ENV_FILE="$(dirname "$0")/.env"
+if [ -f "$ENV_FILE" ]; then
+    while read -r line || [ -n "$line" ]; do
+        # Remove carriage return for CRLF compatibility
+        line=$(echo "$line" | tr -d '\r')
+        # Skip comments and empty lines
+        case "$line" in
+            \#*|"") continue ;;
+        esac
+        key="${line%%=*}"
+        val="${line#*=}"
+        key=$(echo "$key" | tr -d ' \t')
+        val=$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+        export "$key=$val"
+    done < "$ENV_FILE"
+fi
+
+# Check if required environment variables are set. If not, error and exit.
+err=0
+
+if [ -z "$LOG_URL" ]; then
+    echo "[ERROR] LOG_URL is not set." >&2
+    err=1
+fi
+
+if [ -z "$DEVICE_ID" ]; then
+    echo "[ERROR] DEVICE_ID is not set." >&2
+    err=1
+fi
+
+if [ -z "$TRAFFIC_METHOD" ]; then
+    if [ -n "$DEVICE_LOCATION" ]; then
+        TRAFFIC_METHOD="$DEVICE_LOCATION"
+    else
+        echo "[ERROR] TRAFFIC_METHOD (or DEVICE_LOCATION) is not set." >&2
+        err=1
+    fi
+fi
+
+if [ -z "$AUTH_TOKEN" ]; then
+    echo "[ERROR] AUTH_TOKEN is not set." >&2
+    err=1
+fi
+
+if [ "$err" -ne 0 ]; then
+    echo "[FATAL] Missing required configuration. Exiting..." >&2
+    exit 1
+fi
 
 generate_uuid() {
     if command -v uuidgen >/dev/null 2>&1; then
