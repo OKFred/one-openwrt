@@ -5,7 +5,7 @@ CFG="./config.yaml"
 RULE="./rule.yaml"
 PID_FILE="openGFW.pid"
 UPLOAD_PID_FILE="upload.pid"
-LOG_FILE="openGFW.log"
+FIFO_FILE="openGFW.fifo"
 
 # Load public helper and load .env file
 . "$(dirname "$0")/../utils/index.sh"
@@ -97,14 +97,21 @@ parse_and_upload() {
 
 start_app() {
     echo "[INFO] starting OpenGFW..."
-    # Start OpenGFW and redirect logs to a file.
-    $BIN -c "$CFG" "$RULE" > "$LOG_FILE" 2>&1 &
+    
+    # Ensure FIFO exists
+    if [ -e "$FIFO_FILE" ] && [ ! -p "$FIFO_FILE" ]; then
+        rm -f "$FIFO_FILE"
+    fi
+    [ -p "$FIFO_FILE" ] || mkfifo "$FIFO_FILE"
+
+    # Start OpenGFW and redirect logs to the FIFO.
+    $BIN -c "$CFG" "$RULE" > "$FIFO_FILE" 2>&1 &
     echo $! > "$PID_FILE"
 
-    # Follow the log file and upload parsed entries.
-    tail -f "$LOG_FILE" | while read -r line; do
+    # Read from the FIFO and upload parsed entries.
+    while read -r line; do
         parse_and_upload "$line"
-    done &
+    done < "$FIFO_FILE" &
     echo $! > "$UPLOAD_PID_FILE"
 }
 
@@ -121,8 +128,8 @@ stop_app() {
         kill "$UPID" 2>/dev/null
         rm -f "$UPLOAD_PID_FILE"
     fi
-    # Stop possible orphaned tail processes.
-    pgrep -f "tail -f $LOG_FILE" | xargs kill 2>/dev/null
+    # Clean up the FIFO file
+    rm -f "$FIFO_FILE"
 }
 
 restart_app() {
