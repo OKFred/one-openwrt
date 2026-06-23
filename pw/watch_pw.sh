@@ -44,25 +44,25 @@ if [ "$err" -ne 0 ]; then
     exit 1
 fi
 
-parse_and_upload() {
-    line="$1"
-    [ -z "$line" ] && return
+upload_batch() {
+    lines="$1"
+    [ -z "$lines" ] && return
 
     # Generate JSON payload using jq
     payload=$(jq -n \
         --arg device_id_raw "$DEVICE_ID" \
         --arg traffic_method "$TRAFFIC_METHOD" \
-        --arg line "$line" \
+        --arg lines_str "$lines" \
         '{
             device_id: ($device_id_raw | tonumber? // $device_id_raw),
             traffic_method: $traffic_method,
             category: "pw",
-            logs: [$line]
+            logs: ($lines_str | split("\n") | map(select(. != "")))
         }')
 
     if [ -z "$payload" ]; then
         if [ "$DEBUG" = "1" ] || [ "$DEBUG" = "true" ]; then
-            echo "[DEBUG] Failed to generate payload (jq error) for line: $line"
+            echo "[DEBUG] Failed to generate payload (jq error) for batch."
         fi
         return
     fi
@@ -87,10 +87,43 @@ start_app() {
         touch "$LOG_FILE"
     fi
 
-    # Follow the log file and upload entries
-    tail -F "$LOG_FILE" | while read -r line; do
-        parse_and_upload "$line"
-    done
+    # Follow the log file and upload entries in batches
+    tail -F "$LOG_FILE" | (
+        buffer=""
+        count=0
+        last_flush=$(date +%s)
+        BATCH_SIZE=20
+        BATCH_TIMEOUT=5
+
+        while true; do
+            read -r -t 1 line
+            status=$?
+            if [ $status -eq 0 ]; then
+                [ -z "$line" ] && continue
+                buffer="${buffer}${line}
+"
+                count=$((count + 1))
+            elif [ $status -gt 128 ]; then
+                # Timeout, continue to check flush condition
+                :
+            else
+                # EOF / Error
+                if [ "$count" -gt 0 ]; then
+                    upload_batch "$buffer"
+                fi
+                break
+            fi
+
+            now=$(date +%s)
+            elapsed=$((now - last_flush))
+            if [ "$count" -gt 0 ] && { [ "$count" -ge "$BATCH_SIZE" ] || [ "$elapsed" -ge "$BATCH_TIMEOUT" ]; }; then
+                upload_batch "$buffer"
+                buffer=""
+                count=0
+                last_flush=$now
+            fi
+        done
+    )
 }
 
 stop_app() {
