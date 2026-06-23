@@ -1,6 +1,6 @@
 ### @description: 用于 openwrt 固件的自动下载、解压、扩容、打包
 
-### @author: Fred Zhang Qi
+### @author: Fred
 
 ### @datetime: 2024-01-13
 
@@ -27,3 +27,5 @@
 ## 额外功能
 
 ### 流量审计与限制
+
+- 基于 openGFW 和 PW 的日志分析
