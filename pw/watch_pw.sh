@@ -96,22 +96,29 @@ start_app() {
         BATCH_TIMEOUT=5
 
         while true; do
-            read -r -t 1 line
+            start_time=$(date +%s)
+            read -r -t 2 line
             status=$?
+            end_time=$(date +%s)
+            elapsed_read=$((end_time - start_time))
+
             if [ $status -eq 0 ]; then
                 [ -z "$line" ] && continue
                 buffer="${buffer}${line}
 "
                 count=$((count + 1))
-            elif [ $status -gt 128 ]; then
-                # Timeout, continue to check flush condition
-                :
             else
-                # EOF / Error
-                if [ "$count" -gt 0 ]; then
-                    upload_batch "$buffer"
+                # Non-zero status: check if it's EOF (instant return) or Timeout (took >= 2s)
+                if [ "$elapsed_read" -lt 2 ]; then
+                    # EOF / Error (pipe closed)
+                    if [ "$count" -gt 0 ]; then
+                        upload_batch "$buffer"
+                    fi
+                    break
+                else
+                    # Timeout: keep looping
+                    :
                 fi
-                break
             fi
 
             now=$(date +%s)
