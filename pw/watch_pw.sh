@@ -2,23 +2,10 @@
 
 PID_FILE="uploader.pid"
 
-# Load .env file from the same directory if it exists
-ENV_FILE="$(dirname "$0")/.env"
-if [ -f "$ENV_FILE" ]; then
-    while read -r line || [ -n "$line" ]; do
-        # Remove carriage return for CRLF compatibility
-        line=$(echo "$line" | tr -d '\r')
-        # Skip comments and empty lines
-        case "$line" in
-            \#*|"") continue ;;
-        esac
-        key="${line%%=*}"
-        val="${line#*=}"
-        key=$(echo "$key" | tr -d ' \t')
-        val=$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
-        export "$key=$val"
-    done < "$ENV_FILE"
-fi
+# Load public helper and load .env file
+. "$(dirname "$0")/../utils/index.sh"
+load_env "$(dirname "$0")/.env"
+
 
 # Check if required environment variables are set
 err=0
