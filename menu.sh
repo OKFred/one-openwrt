@@ -41,6 +41,7 @@ main() {
     echo -n "your choice--请输入你的选择："
     read the_user_choice
     case "$the_user_choice" in
+    "") exit 0 ;;
     01 | 1) the_nginx_installer ;;
     02 | 2) the_nginx_forwarder ;;
     03 | 3) the_nginx_restarter ;;
