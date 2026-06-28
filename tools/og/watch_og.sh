@@ -1,11 +1,11 @@
 #!/bin/sh
 
-BIN="./op"
+BIN="./og"
 CFG="./config.yaml"
 RULE="./rule.yaml"
-PID_FILE="op.pid"
+PID_FILE="og.pid"
 UPLOAD_PID_FILE="upload.pid"
-FIFO_FILE="op.fifo"
+FIFO_FILE="og.fifo"
 
 # Load public helper and load .env file
 . "$(dirname "$0")/../../utils/index.sh"
@@ -56,7 +56,7 @@ parse_and_upload() {
     line="$1"
     [ -z "$line" ] && return
 
-    # op log fields are separated by tabs.
+    # og log fields are separated by tabs.
     log_time=$(printf '%s\n' "$line" | cut -f1)
 
     # Ignore non-log lines.
@@ -72,7 +72,7 @@ parse_and_upload() {
         '{
             device_id: ($device_id_raw | tonumber? // $device_id_raw),
             traffic_method: $traffic_method,
-            category: "op",
+            category: "og",
             logs: [$line]
         }')
 
@@ -96,7 +96,7 @@ parse_and_upload() {
 }
 
 start_app() {
-    echo "[INFO] starting op..."
+    echo "[INFO] starting og..."
     
     # Ensure FIFO exists
     if [ -e "$FIFO_FILE" ] && [ ! -p "$FIFO_FILE" ]; then
@@ -104,7 +104,7 @@ start_app() {
     fi
     [ -p "$FIFO_FILE" ] || mkfifo "$FIFO_FILE"
 
-    # Start op and redirect logs to the FIFO.
+    # Start og and redirect logs to the FIFO.
     $BIN -c "$CFG" "$RULE" > "$FIFO_FILE" 2>&1 &
     echo $! > "$PID_FILE"
 
@@ -118,7 +118,7 @@ start_app() {
 stop_app() {
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
-        echo "[INFO] stopping op pid=$PID"
+        echo "[INFO] stopping og pid=$PID"
         kill "$PID" 2>/dev/null
         rm -f "$PID_FILE"
     fi
