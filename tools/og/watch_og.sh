@@ -8,7 +8,7 @@ UPLOAD_PID_FILE="upload.pid"
 FIFO_FILE="openGFW.fifo"
 
 # Load public helper and load .env file
-. "$(dirname "$0")/../utils/index.sh"
+. "$(dirname "$0")/../../utils/index.sh"
 load_env "$(dirname "$0")/.env"
 
 

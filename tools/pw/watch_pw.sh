@@ -3,7 +3,7 @@
 PID_FILE="uploader.pid"
 
 # Load public helper and load .env file
-. "$(dirname "$0")/../utils/index.sh"
+. "$(dirname "$0")/../../utils/index.sh"
 load_env "$(dirname "$0")/.env"
 
 
