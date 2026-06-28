@@ -36,6 +36,8 @@ main() {
     echo "04. nginx port cleaner--清理nginx端口"
     echo "05. traffic audit--启动流量审计与限制"
     echo "06. traffic audit stopper--停止流量审计与限制"
+    echo "07. ssh watch--启动 SSH 入侵监控"
+    echo "08. ssh watch stopper--停止 SSH 入侵监控"
     echo "09. about--关于"
     echo "00. exit--退出"
     echo
@@ -49,6 +51,9 @@ main() {
     04 | 4) the_nginx_port_cleaner ;;
     05 | 5) sh ./tools/index.sh ;;
     06 | 6) sh ./tools/stop.sh ;;
+    07 | 7) sh ./tools/ssh-watch/index.sh &
+           echo "[INFO] ssh-watch 已在后台启动，日志: ./tools/ssh-watch/ssh-watch.log" && menu_back ;;
+    08 | 8) sh ./tools/ssh-watch/stop.sh && menu_back ;;
     09 | 9) nano readme.md ;;
     00 | 0) exit 1 ;;
     u) echo "???" ;;
