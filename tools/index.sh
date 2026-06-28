@@ -51,8 +51,8 @@ read -r choice
 case "$choice" in
     [yY][eE][sS]|[yY])
         echo "[INFO] Config start on boot--正在配置开机自启..."
-        add_to_rc_local "(cd $SCRIPT_DIR/og && sh ./index.sh)"
-        add_to_rc_local "(cd $SCRIPT_DIR/pw && sh ./index.sh)"
+        add_to_rc_local "(sleep 60 && cd $SCRIPT_DIR/og && sh ./index.sh) &"
+        add_to_rc_local "(sleep 60 && cd $SCRIPT_DIR/pw && sh ./index.sh) &"
         ;;
     *)
         echo "[INFO] Skip start on boot--跳过配置开机自启，直接在当前终端启动服务..."
