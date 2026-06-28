@@ -1,11 +1,11 @@
 #!/bin/sh
 
-BIN="./OpenGFW"
+BIN="./op"
 CFG="./config.yaml"
 RULE="./rule.yaml"
-PID_FILE="openGFW.pid"
+PID_FILE="op.pid"
 UPLOAD_PID_FILE="upload.pid"
-FIFO_FILE="openGFW.fifo"
+FIFO_FILE="op.fifo"
 
 # Load public helper and load .env file
 . "$(dirname "$0")/../../utils/index.sh"
@@ -56,7 +56,7 @@ parse_and_upload() {
     line="$1"
     [ -z "$line" ] && return
 
-    # OpenGFW log fields are separated by tabs.
+    # op log fields are separated by tabs.
     log_time=$(printf '%s\n' "$line" | cut -f1)
 
     # Ignore non-log lines.
@@ -72,7 +72,7 @@ parse_and_upload() {
         '{
             device_id: ($device_id_raw | tonumber? // $device_id_raw),
             traffic_method: $traffic_method,
-            category: "openGFW",
+            category: "op",
             logs: [$line]
         }')
 
@@ -96,7 +96,7 @@ parse_and_upload() {
 }
 
 start_app() {
-    echo "[INFO] starting OpenGFW..."
+    echo "[INFO] starting op..."
     
     # Ensure FIFO exists
     if [ -e "$FIFO_FILE" ] && [ ! -p "$FIFO_FILE" ]; then
@@ -104,7 +104,7 @@ start_app() {
     fi
     [ -p "$FIFO_FILE" ] || mkfifo "$FIFO_FILE"
 
-    # Start OpenGFW and redirect logs to the FIFO.
+    # Start op and redirect logs to the FIFO.
     $BIN -c "$CFG" "$RULE" > "$FIFO_FILE" 2>&1 &
     echo $! > "$PID_FILE"
 
@@ -118,7 +118,7 @@ start_app() {
 stop_app() {
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
-        echo "[INFO] stopping OpenGFW pid=$PID"
+        echo "[INFO] stopping op pid=$PID"
         kill "$PID" 2>/dev/null
         rm -f "$PID_FILE"
     fi
