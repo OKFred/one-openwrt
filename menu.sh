@@ -3,6 +3,9 @@
 #@author: Fred Zhang Qi
 #@datetime: 2024-02-01
 
+# 自动为当前目录及子目录下的所有 .sh 脚本加上执行权限
+find "$(dirname "$0")" -name "*.sh" -exec chmod +x {} \; 2>/dev/null
+
 #文件依赖
 #⚠️import--需要引入包含函数的文件
 source ./components/the_nginx_installer.sh
