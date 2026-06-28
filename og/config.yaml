@@ -2,7 +2,7 @@ io:
   queueSize: 1024
   rcvBuf: 4194304
   sndBuf: 4194304
-  local: false # 如果需要在 FORWARD 链上运行 OpenGFW，请设置为 false
+  local: false # 如果需要在 FORWARD 链上运行 og，请设置为 false
 
 workers:
   count: 4
