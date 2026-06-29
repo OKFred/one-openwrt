@@ -1,6 +1,6 @@
 #!/bin/bash
 #@description: 菜单化显示工具箱列表
-#@author: Fred Zhang Qi
+#@author: Fred
 #@datetime: 2024-02-01
 
 # 自动为当前目录及子目录下的所有 .sh 脚本加上执行权限

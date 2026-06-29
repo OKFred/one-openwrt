@@ -1,6 +1,6 @@
 #!/bin/bash
 #@description: Openwrt固件扩容
-#@author: Fred Zhang Qi
+#@author: Fred
 #@datetime: 2024-01-13
 
 #文件依赖

@@ -1,6 +1,6 @@
 #!/bin/bash
 #@description: 下载Openwrt的nginx包
-#@author: Fred Zhang Qi
+#@author: Fred
 #@datetime: 2024-02-01
 
 #文件依赖

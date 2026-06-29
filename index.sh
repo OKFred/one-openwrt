@@ -1,6 +1,6 @@
 #!/bin/bash
 #@description: 用于下载Openwrt固件并自动扩容
-#@author: Fred Zhang Qi
+#@author: Fred
 #@datetime: 2024-01-13
 
 #文件依赖

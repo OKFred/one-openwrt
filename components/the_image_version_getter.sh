@@ -1,6 +1,6 @@
 #!/bin/bash
 #@description: 获取最新版本号
-#@author: Fred Zhang Qi
+#@author: Fred
 #@datetime: 2024-01-13
 
 #文件依赖

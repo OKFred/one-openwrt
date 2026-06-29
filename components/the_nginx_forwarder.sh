@@ -1,6 +1,6 @@
 #!/bin/bash
 #@description: 快速配置nginx端口转发
-#@author: Fred Zhang Qi
+#@author: Fred
 #@datetime: 2024-02-01
 
 #文件依赖

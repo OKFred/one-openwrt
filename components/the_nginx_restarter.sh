@@ -1,6 +1,6 @@
 #!/bin/bash
 #@description: 重启nginx进程
-#@author: Fred Zhang Qi
+#@author: Fred
 #@datetime: 2024-02-08
 
 #文件依赖

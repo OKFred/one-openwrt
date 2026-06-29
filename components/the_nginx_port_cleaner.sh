@@ -1,6 +1,6 @@
 #!/bin/bash
 #@description: 清理端口
-#@author: Fred Zhang Qi
+#@author: Fred
 #@datetime: 2024-02-09
 
 #文件依赖
