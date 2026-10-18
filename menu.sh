@@ -3,15 +3,17 @@
 #@author: Fred
 #@datetime: 2024-02-01
 
+MENU_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)" || exit 1
+
 # 自动为当前目录及子目录下的所有 .sh 脚本加上执行权限
-find "$(dirname "$0")" -name "*.sh" -exec chmod +x {} \; 2>/dev/null
+find "$MENU_DIR" -name "*.sh" -exec chmod +x {} \; 2>/dev/null
 
 #文件依赖
 #⚠️import--需要引入包含函数的文件
-source ./components/the_nginx_installer.sh
-source ./components/the_nginx_forwarder.sh
-source ./components/the_nginx_restarter.sh
-source ./components/the_nginx_port_cleaner.sh
+source "$MENU_DIR/components/the_nginx_installer.sh" || exit 1
+source "$MENU_DIR/components/the_nginx_forwarder.sh" || exit 1
+source "$MENU_DIR/components/the_nginx_restarter.sh" || exit 1
+source "$MENU_DIR/components/the_nginx_port_cleaner.sh" || exit 1
 
 menu_title() {
   #clear
@@ -49,12 +51,12 @@ main() {
     02 | 2) the_nginx_forwarder ;;
     03 | 3) the_nginx_restarter ;;
     04 | 4) the_nginx_port_cleaner ;;
-    05 | 5) sh ./tools/index.sh ;;
-    06 | 6) sh ./tools/stop.sh ;;
-    07 | 7) sh ./tools/ssh-watch/index.sh &
-           echo "[INFO] ssh-watch 已在后台启动，日志: ./tools/ssh-watch/ssh-watch.log" && menu_back ;;
-    08 | 8) sh ./tools/ssh-watch/stop.sh && menu_back ;;
-    09 | 9) nano readme.md ;;
+    05 | 5) sh "$MENU_DIR/tools/index.sh" ;;
+    06 | 6) sh "$MENU_DIR/tools/stop.sh" ;;
+    07 | 7) sh "$MENU_DIR/tools/ssh-watch/index.sh" &
+           echo "[INFO] ssh-watch 已在后台启动，日志: $MENU_DIR/tools/ssh-watch/ssh-watch.log" && menu_back ;;
+    08 | 8) sh "$MENU_DIR/tools/ssh-watch/stop.sh" && menu_back ;;
+    09 | 9) nano "$MENU_DIR/readme.md" ;;
     00 | 0) exit 1 ;;
     u) echo "???" ;;
     *) echo "error input--输入有误，请重新输入！" && menu_back ;;
