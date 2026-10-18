@@ -1,3 +1,4 @@
 geosite.dat
 *.pid
 .env
+/tools/og/build/

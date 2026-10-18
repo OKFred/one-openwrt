@@ -1,0 +1,86 @@
+{
+  "scope": "TCP idle-state retention mitigation; no hard RSS limit or on-router acceptance claim",
+  "opengfw": {
+    "module": "github.com/apernet/OpenGFW",
+    "version": "v0.3.2",
+    "revision": "393c29bd2dec4e3e3b1186f35e21b73fb59470c2"
+  },
+  "gopacket": {
+    "module": "github.com/google/gopacket",
+    "version": "v1.1.20-0.20220810144506-32ee38206866"
+  },
+  "toolchain": "go1.26.4",
+  "target": {
+    "GOOS": "linux",
+    "GOARCH": "arm64",
+    "GOARM64": "v8.0",
+    "CGO_ENABLED": "0"
+  },
+  "build_flags": [
+    "-mod=readonly",
+    "-trimpath",
+    "-buildvcs=false"
+  ],
+  "binary": {
+    "path": "og",
+    "bytes": 20060824,
+    "sha256": "ae5cd150c6c6eace7e8f5ad7671c54197ad756ade586827360c4f7a3456b606e"
+  },
+  "source_archive": {
+    "path": "source/opengfw-ttl-source.zip",
+    "bytes": 1217663,
+    "sha256": "4e236b20073b0f841b993111e07f04352cee59734a2175659fa9b80c74d346a6"
+  },
+  "patches": [
+    {
+      "path": "patches/opengfw.patch",
+      "sha256": "8cf66b28d0248bb7ad5e40a0967f4e17747c9bd90087141887ce05df617f9192"
+    },
+    {
+      "path": "patches/gopacket.patch",
+      "sha256": "7af7ab0fa3598e3eb6229d63840c395e7d2012ead310c463b3cac5557669bd17"
+    }
+  ],
+  "source_files": [
+    {
+      "path": "opengfw/go.mod",
+      "original_sha256": "c058d6742ab294c3186dca6d7bf8b68806785709fa37e8df3fea45d52a1b6439",
+      "candidate_sha256": "2e976edb3b1381250a653e90fd357a8fcac3bc381b47babfe6c2a897f1ed5ea4"
+    },
+    {
+      "path": "opengfw/engine/engine.go",
+      "original_sha256": "97f7774af9985c6e43547ff0a797e06f41a436eac82761c2d9aeced936c78c70",
+      "candidate_sha256": "95a40cdf04196dfe41d46669d53f8a17f69b2d2579718b073c6f261cd9c995e8"
+    },
+    {
+      "path": "opengfw/engine/worker.go",
+      "original_sha256": "15ad343fe327b319d9a2db6f876a6725ecd09705a954098a36bab2a3599713b6",
+      "candidate_sha256": "73438312c97905e62276b30febe7d30a0a2f0b1906b0645d9a073c154744173d"
+    },
+    {
+      "path": "opengfw/engine/tcp.go",
+      "original_sha256": "a82a89d7dc663437844e7e528e4ea500f16e2b8fad92a916b69cba6d2a71c1da",
+      "candidate_sha256": "6a421bc4bb0b68eed19f5c9f5e26e04c14c1ab81e7a63d7e5eb4f7104d58a237"
+    },
+    {
+      "path": "opengfw/engine/retention_candidate_test.go",
+      "original_sha256": null,
+      "candidate_sha256": "4a26fa69b64b7943a0b6d411cb4d205dfb21ea74a7a5e76ddb7e46443d762de7"
+    },
+    {
+      "path": "gopacket/reassembly/memory.go",
+      "original_sha256": "d68c6bb345e03af5e0543b229eddf45e4522565daf405edcdf3aec1c8f2abb21",
+      "candidate_sha256": "7e6dd1997b34d53dd8b189bf032f2cfa3499db82ce84274617d15dfd296b7ecc"
+    },
+    {
+      "path": "gopacket/reassembly/tcpassembly.go",
+      "original_sha256": "93d6094eaaef16e07c21f346e588f537da271c89dc15cdf13bb0d55e40796a2e",
+      "candidate_sha256": "24c15f38f33be76a8b5e0243702acf788b08ae91bc72468207c213216779a869"
+    },
+    {
+      "path": "gopacket/reassembly/retention_candidate_test.go",
+      "original_sha256": null,
+      "candidate_sha256": "5515920ad3aca01c7792190df9672796528bb24f0af3531474e3ca62604e2272"
+    }
+  ]
+}

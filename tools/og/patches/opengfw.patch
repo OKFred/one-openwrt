@@ -1,0 +1,455 @@
+--- a/go.mod
++++ b/go.mod
+@@ -1,4 +1,7 @@
+ module github.com/apernet/OpenGFW
++
++// Offline short-term candidate: exact dependency source with retention cleanup.
++replace github.com/google/gopacket => ../gopacket
+ 
+ go 1.21
+ 
+--- a/engine/engine.go
++++ b/engine/engine.go
+@@ -3,6 +3,8 @@
+ import (
+ 	"context"
+ 	"runtime"
++	"sync"
++	"time"
+ 
+ 	"github.com/apernet/OpenGFW/io"
+ 	"github.com/apernet/OpenGFW/ruleset"
+@@ -58,11 +60,19 @@
+ 
+ func (e *engine) Run(ctx context.Context) error {
+ 	ioCtx, ioCancel := context.WithCancel(ctx)
+-	defer ioCancel() // Stop workers & IO
++	var workerWG sync.WaitGroup
++	defer func() {
++		ioCancel() // Stop workers & unblock pending Feed calls before waiting.
++		workerWG.Wait()
++	}()
+ 
+ 	// Start workers
+ 	for _, w := range e.workers {
+-		go w.Run(ioCtx)
++		workerWG.Add(1)
++		go func(w *worker) {
++			defer workerWG.Done()
++			w.Run(ioCtx)
++		}(w)
+ 	}
+ 
+ 	// Register IO callback
+@@ -72,7 +82,7 @@
+ 			errChan <- err
+ 			return false
+ 		}
+-		return e.dispatch(p)
++		return e.dispatch(ioCtx, p)
+ 	})
+ 	if err != nil {
+ 		return err
+@@ -88,7 +98,7 @@
+ }
+ 
+ // dispatch dispatches a packet to a worker.
+-func (e *engine) dispatch(p io.Packet) bool {
++func (e *engine) dispatch(ctx context.Context, p io.Packet) bool {
+ 	data := p.Data()
+ 	ipVersion := data[0] >> 4
+ 	var layerType gopacket.LayerType
+@@ -104,12 +114,12 @@
+ 	// Load balance by stream ID
+ 	index := p.StreamID() % uint32(len(e.workers))
+ 	packet := gopacket.NewPacket(data, layerType, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+-	e.workers[index].Feed(&workerPacket{
++	packet.Metadata().CaptureInfo.Timestamp = time.Now()
++	return e.workers[index].Feed(ctx, &workerPacket{
+ 		StreamID: p.StreamID(),
+ 		Packet:   packet,
+ 		SetVerdict: func(v io.Verdict, b []byte) error {
+ 			return e.io.SetVerdict(p, v, b)
+ 		},
+ 	})
+-	return true
+ }
+--- a/engine/worker.go
++++ b/engine/worker.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"context"
++	"time"
+ 
+ 	"github.com/apernet/OpenGFW/io"
+ 	"github.com/apernet/OpenGFW/ruleset"
+@@ -17,6 +18,8 @@
+ 	defaultTCPMaxBufferedPagesTotal         = 4096
+ 	defaultTCPMaxBufferedPagesPerConnection = 64
+ 	defaultUDPMaxStreams                    = 4096
++	tcpCleanupInterval                      = 5 * time.Second
++	tcpIdleTimeout                          = 120 * time.Second
+ )
+ 
+ type workerPacket struct {
+@@ -104,17 +107,31 @@
+ 	}, nil
+ }
+ 
+-func (w *worker) Feed(p *workerPacket) {
+-	w.packetChan <- p
++func (w *worker) Feed(ctx context.Context, p *workerPacket) bool {
++	if ctx.Err() != nil {
++		return false
++	}
++	select {
++	case <-ctx.Done():
++		return false
++	case w.packetChan <- p:
++		return true
++	}
+ }
+ 
+ func (w *worker) Run(ctx context.Context) {
+ 	w.logger.WorkerStart(w.id)
+ 	defer w.logger.WorkerStop(w.id)
++	defer w.tcpAssembler.FlushAll()
++	ticker := time.NewTicker(tcpCleanupInterval)
++	defer ticker.Stop()
+ 	for {
+ 		select {
+ 		case <-ctx.Done():
+ 			return
++		case <-ticker.C:
++			// The assembler must only be used by this worker goroutine.
++			w.tcpAssembler.FlushCloseOlderThan(time.Now().Add(-tcpIdleTimeout))
+ 		case wPkt := <-w.packetChan:
+ 			if wPkt == nil {
+ 				// Closed
+@@ -168,6 +185,12 @@
+ }
+ 
+ func (w *worker) handleTCP(ipFlow gopacket.Flow, pMeta *gopacket.PacketMetadata, tcp *layers.TCP) io.Verdict {
++	if pMeta == nil {
++		pMeta = &gopacket.PacketMetadata{}
++	}
++	if pMeta.CaptureInfo.Timestamp.IsZero() {
++		pMeta.CaptureInfo.Timestamp = time.Now()
++	}
+ 	ctx := &tcpContext{
+ 		PacketMetadata: pMeta,
+ 		Verdict:        tcpVerdictAccept,
+--- a/engine/tcp.go
++++ b/engine/tcp.go
+@@ -119,13 +119,23 @@
+ 		// properties that need to be matched.
+ 		return true
+ 	} else {
+-		ctx := ac.(*tcpContext)
+-		ctx.Verdict = s.lastVerdict
++		if ctx, ok := ac.(*tcpContext); ok && ctx != nil {
++			ctx.Verdict = s.lastVerdict
++		}
+ 		return false
+ 	}
+ }
+ 
+ func (s *tcpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.AssemblerContext) {
++	if s.lastVerdict == tcpVerdictAcceptStream || s.lastVerdict == tcpVerdictDropStream {
++		// Expiration may replay queued data with an old (or nil) context.
++		// A final decision must not cause further analysis or duplicate logs.
++		return
++	}
++	ctx, ok := ac.(*tcpContext)
++	if !ok || ctx == nil {
++		ctx = &tcpContext{Verdict: tcpVerdictAccept}
++	}
+ 	dir, start, end, skip := sg.Info()
+ 	rev := dir == reassembly.TCPDirServerToClient
+ 	avail, _ := sg.Lengths()
+@@ -143,7 +153,6 @@
+ 			s.doneEntries = append(s.doneEntries, entry)
+ 		}
+ 	}
+-	ctx := ac.(*tcpContext)
+ 	if updated || s.virgin {
+ 		s.virgin = false
+ 		s.logger.TCPStreamPropUpdate(s.info, false)
+--- /dev/null
++++ b/engine/retention_candidate_test.go
+@@ -0,0 +1,274 @@
++package engine
++
++import (
++	"context"
++	"net"
++	"reflect"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/apernet/OpenGFW/analyzer"
++	"github.com/apernet/OpenGFW/io"
++	"github.com/apernet/OpenGFW/ruleset"
++	"github.com/google/gopacket"
++	"github.com/google/gopacket/layers"
++	"github.com/google/gopacket/reassembly"
++)
++
++type candidateLogger struct {
++	starts  atomic.Int32
++	stops   atomic.Int32
++	actions atomic.Int32
++}
++
++func (l *candidateLogger) WorkerStart(int)                            { l.starts.Add(1) }
++func (l *candidateLogger) WorkerStop(int)                             { l.stops.Add(1) }
++func (*candidateLogger) TCPStreamNew(int, ruleset.StreamInfo)         {}
++func (*candidateLogger) TCPStreamPropUpdate(ruleset.StreamInfo, bool) {}
++func (l *candidateLogger) TCPStreamAction(ruleset.StreamInfo, ruleset.Action, bool) {
++	l.actions.Add(1)
++}
++func (*candidateLogger) UDPStreamNew(int, ruleset.StreamInfo)                     {}
++func (*candidateLogger) UDPStreamPropUpdate(ruleset.StreamInfo, bool)             {}
++func (*candidateLogger) UDPStreamAction(ruleset.StreamInfo, ruleset.Action, bool) {}
++func (*candidateLogger) ModifyError(ruleset.StreamInfo, error)                    {}
++func (*candidateLogger) AnalyzerDebugf(int64, string, string, ...interface{})     {}
++func (*candidateLogger) AnalyzerInfof(int64, string, string, ...interface{})      {}
++func (*candidateLogger) AnalyzerErrorf(int64, string, string, ...interface{})     {}
++
++type candidateRules struct{}
++
++func (candidateRules) Analyzers(ruleset.StreamInfo) []analyzer.Analyzer { return nil }
++func (candidateRules) Match(ruleset.StreamInfo) ruleset.MatchResult {
++	return ruleset.MatchResult{Action: ruleset.ActionAllow}
++}
++
++func candidateWorker(t *testing.T) (*worker, *candidateLogger) {
++	t.Helper()
++	logger := &candidateLogger{}
++	w, err := newWorker(workerConfig{ID: 0, Logger: logger, Ruleset: candidateRules{}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return w, logger
++}
++
++func candidateFlow() gopacket.Flow {
++	return gopacket.NewFlow(layers.EndpointIPv4, net.ParseIP("192.0.2.1").To4(), net.ParseIP("198.51.100.1").To4())
++}
++
++func candidateTCP(port uint16) *layers.TCP {
++	packet := &layers.TCP{SrcPort: layers.TCPPort(port), DstPort: 443, SYN: true, Seq: 1000}
++	packet.SetInternalPortsForTesting()
++	return packet
++}
++
++// Reflection only observes exact-version internals in tests, never production.
++func candidatePoolCount(w *worker) int {
++	return reflect.ValueOf(w.tcpStreamPool).Elem().FieldByName("conns").Len()
++}
++
++func candidateFreeStreams(w *worker) int {
++	free := reflect.ValueOf(w.tcpStreamPool).Elem().FieldByName("free")
++	retained := 0
++	for i := 0; i < free.Len(); i++ {
++		conn := free.Index(i).Elem()
++		for _, direction := range []string{"c2s", "s2c"} {
++			if !conn.FieldByName(direction).FieldByName("stream").IsNil() {
++				retained++
++			}
++		}
++	}
++	return retained
++}
++
++func TestCandidateDispatchTimestampsAndZeroMetadataFallback(t *testing.T) {
++	w, _ := candidateWorker(t)
++	e := &engine{workers: []*worker{w}}
++	ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolTCP, SrcIP: net.ParseIP("192.0.2.1").To4(), DstIP: net.ParseIP("198.51.100.1").To4()}
++	tcp := candidateTCP(40000)
++	if err := tcp.SetNetworkLayerForChecksum(ip); err != nil {
++		t.Fatal(err)
++	}
++	buffer := gopacket.NewSerializeBuffer()
++	if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, ip, tcp); err != nil {
++		t.Fatal(err)
++	}
++	before := time.Now()
++	if !e.dispatch(context.Background(), candidatePacket(buffer.Bytes())) {
++		t.Fatal("dispatch rejected valid packet")
++	}
++	wPkt := <-w.packetChan
++	stamp := wPkt.Packet.Metadata().Timestamp
++	if stamp.IsZero() || stamp.Before(before) || stamp.After(time.Now()) {
++		t.Fatalf("invalid dispatch timestamp: %v", stamp)
++	}
++	metadata := &gopacket.PacketMetadata{}
++	w.handleTCP(candidateFlow(), metadata, candidateTCP(40001))
++	if metadata.Timestamp.IsZero() {
++		t.Fatal("zero timestamp fallback was not applied")
++	}
++	w.handleTCP(candidateFlow(), nil, candidateTCP(40002))
++	w.tcpAssembler.FlushAll()
++}
++
++type candidatePacket []byte
++
++func (candidatePacket) StreamID() uint32 { return 0 }
++func (p candidatePacket) Data() []byte   { return []byte(p) }
++
++func TestCandidateTTLReclaimsFinalFlowsAndRetainsFreshFlow(t *testing.T) {
++	w, logger := candidateWorker(t)
++	now := time.Now()
++	for i := 0; i < 1000; i++ {
++		metadata := &gopacket.PacketMetadata{CaptureInfo: gopacket.CaptureInfo{Timestamp: now.Add(-tcpIdleTimeout - time.Second)}}
++		if verdict := w.handleTCP(candidateFlow(), metadata, candidateTCP(uint16(40000+i))); verdict != io.VerdictAcceptStream {
++			t.Fatalf("old stream verdict: %v", verdict)
++		}
++	}
++	fresh := &gopacket.PacketMetadata{CaptureInfo: gopacket.CaptureInfo{Timestamp: now}}
++	w.handleTCP(candidateFlow(), fresh, candidateTCP(50000))
++	beforeActions := logger.actions.Load()
++	w.tcpAssembler.FlushCloseOlderThan(now.Add(-tcpIdleTimeout))
++	if got := candidatePoolCount(w); got != 1 {
++		t.Fatalf("pool count=%d, want only one fresh stream", got)
++	}
++	if got := candidateFreeStreams(w); got != 0 {
++		t.Fatalf("free list retains %d stream references", got)
++	}
++	if logger.actions.Load() != beforeActions {
++		t.Fatal("expiration duplicated final actions")
++	}
++	w.tcpAssembler.FlushAll()
++	if candidatePoolCount(w) != 0 || candidateFreeStreams(w) != 0 {
++		t.Fatal("final cleanup retained pool entries or stream references")
++	}
++}
++
++type candidateEmptySG struct{}
++
++func (candidateEmptySG) Lengths() (int, int)                  { return 0, 0 }
++func (candidateEmptySG) Fetch(int) []byte                     { return nil }
++func (candidateEmptySG) KeepFrom(int)                         {}
++func (candidateEmptySG) CaptureInfo(int) gopacket.CaptureInfo { return gopacket.CaptureInfo{} }
++func (candidateEmptySG) Info() (reassembly.TCPFlowDirection, bool, bool, int) {
++	return reassembly.TCPDirClientToServer, false, false, 0
++}
++func (candidateEmptySG) Stats() reassembly.TCPAssemblyStats { return reassembly.TCPAssemblyStats{} }
++
++func TestCandidateNilContextAndFinalReplay(t *testing.T) {
++	for _, ac := range []reassembly.AssemblerContext{nil, (*tcpContext)(nil), &tcpContext{Verdict: tcpVerdictAccept}} {
++		logger := &candidateLogger{}
++		s := &tcpStream{virgin: true, logger: logger, ruleset: candidateRules{}, info: ruleset.StreamInfo{Props: make(analyzer.CombinedPropMap)}}
++		s.ReassembledSG(candidateEmptySG{}, ac)
++		if s.lastVerdict != tcpVerdictAcceptStream || logger.actions.Load() != 1 {
++			t.Fatal("first no-analyzer packet must still match rules")
++		}
++		oldContext := &tcpContext{Verdict: tcpVerdictDropStream}
++		s.ReassembledSG(nil, nil)
++		s.ReassembledSG(nil, oldContext)
++		if logger.actions.Load() != 1 || oldContext.Verdict != tcpVerdictDropStream {
++			t.Fatal("final replay reanalyzed or overwrote old context")
++		}
++		if s.Accept(nil, gopacket.CaptureInfo{}, reassembly.TCPDirClientToServer, 0, nil, ac) {
++			t.Fatal("final stream unexpectedly accepted another packet")
++		}
++	}
++}
++
++func TestCandidateFeedCancellationUnblocksFullQueue(t *testing.T) {
++	w := &worker{packetChan: make(chan *workerPacket, 1)}
++	w.packetChan <- &workerPacket{}
++	ctx, cancel := context.WithCancel(context.Background())
++	done := make(chan bool, 1)
++	started := make(chan struct{})
++	go func() { close(started); done <- w.Feed(ctx, &workerPacket{}) }()
++	<-started
++	select {
++	case <-done:
++		t.Fatal("full queue unexpectedly accepted a packet before cancellation")
++	case <-time.After(10 * time.Millisecond):
++	}
++	cancel()
++	select {
++	case accepted := <-done:
++		if accepted {
++			t.Fatal("canceled full-queue send succeeded")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("Feed remained blocked after cancellation")
++	}
++}
++
++type candidateIO struct{}
++
++func (candidateIO) Register(context.Context, io.PacketCallback) error { return nil }
++func (candidateIO) SetVerdict(io.Packet, io.Verdict, []byte) error    { return nil }
++func (candidateIO) ProtectedDialContext(context.Context, string, string) (net.Conn, error) {
++	return nil, nil
++}
++func (candidateIO) Close() error { return nil }
++
++func TestCandidateEngineShutdownWaitsForCleanupWithoutNewPackets(t *testing.T) {
++	w, logger := candidateWorker(t)
++	w.handleTCP(candidateFlow(), &gopacket.PacketMetadata{}, candidateTCP(40000))
++	e := &engine{workers: []*worker{w}, io: candidateIO{}}
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	if err := e.Run(ctx); err != nil {
++		t.Fatal(err)
++	}
++	if logger.stops.Load() != 1 || candidatePoolCount(w) != 0 || candidateFreeStreams(w) != 0 {
++		t.Fatal("Engine.Run returned before worker cleanup completed")
++	}
++}
++
++func TestCandidateClosedPacketChannelCleansUp(t *testing.T) {
++	w, logger := candidateWorker(t)
++	w.handleTCP(candidateFlow(), &gopacket.PacketMetadata{}, candidateTCP(40000))
++	close(w.packetChan)
++	w.Run(context.Background())
++	if logger.stops.Load() != 1 || candidatePoolCount(w) != 0 || candidateFreeStreams(w) != 0 {
++		t.Fatal("closed channel did not clean up")
++	}
++}
++
++type candidateObservedFactory struct{ closed chan struct{} }
++type candidateObservedStream struct{ closed chan struct{} }
++
++func (f candidateObservedFactory) New(gopacket.Flow, gopacket.Flow, *layers.TCP, reassembly.AssemblerContext) reassembly.Stream {
++	return candidateObservedStream{closed: f.closed}
++}
++func (candidateObservedStream) Accept(*layers.TCP, gopacket.CaptureInfo, reassembly.TCPFlowDirection, reassembly.Sequence, *bool, reassembly.AssemblerContext) bool {
++	return true
++}
++func (candidateObservedStream) ReassembledSG(reassembly.ScatterGather, reassembly.AssemblerContext) {}
++func (s candidateObservedStream) ReassemblyComplete(reassembly.AssemblerContext) bool {
++	s.closed <- struct{}{}
++	return true
++}
++
++func TestCandidateTickExpiresFlowWithoutNewPackets(t *testing.T) {
++	w, _ := candidateWorker(t)
++	closed := make(chan struct{}, 1)
++	w.tcpStreamPool = reassembly.NewStreamPool(candidateObservedFactory{closed: closed})
++	w.tcpAssembler = reassembly.NewAssembler(w.tcpStreamPool)
++	ctxOld := &tcpContext{PacketMetadata: &gopacket.PacketMetadata{CaptureInfo: gopacket.CaptureInfo{Timestamp: time.Now().Add(-tcpIdleTimeout - time.Second)}}}
++	w.tcpAssembler.AssembleWithContext(candidateFlow(), candidateTCP(40000), ctxOld)
++	ctx, cancel := context.WithCancel(context.Background())
++	done := make(chan struct{})
++	go func() { w.Run(ctx); close(done) }()
++	select {
++	case <-closed:
++	case <-time.After(tcpCleanupInterval + 2*time.Second):
++		cancel()
++		<-done
++		t.Fatal("idle flow was not cleaned by tick without another packet")
++	}
++	cancel()
++	<-done
++	if candidatePoolCount(w) != 0 || candidateFreeStreams(w) != 0 {
++		t.Fatal("tick left an entry or free-list stream reference")
++	}
++}

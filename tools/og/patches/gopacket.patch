@@ -1,0 +1,243 @@
+--- a/reassembly/memory.go
++++ b/reassembly/memory.go
+@@ -124,6 +124,10 @@
+ 	p.mu.Lock()
+ 	if _, ok := p.conns[conn.key]; ok {
+ 		delete(p.conns, conn.key)
++		// The free/all pools retain connection structs until reuse. Do not
++		// retain completed user streams through those reusable structs.
++		conn.c2s.stream = nil
++		conn.s2c.stream = nil
+ 		p.free = append(p.free, conn)
+ 	}
+ 	p.mu.Unlock()
+--- a/reassembly/tcpassembly.go
++++ b/reassembly/tcpassembly.go
+@@ -1200,11 +1200,14 @@
+ 		log.Printf("%v closing", conn)
+ 	}
+ 	half.closed = true
+-	for p := half.first; p != nil; p = p.next {
++	for p := half.first; p != nil; {
+ 		// FIXME: it should be already empty
++		next := p.next // replace clears links before returning the page.
+ 		a.pc.replace(p)
+ 		half.pages--
+-	}
++		p = next
++	}
++	half.first, half.last = nil, nil
+ 	if conn.s2c.closed && conn.c2s.closed {
+ 		if half.stream.ReassemblyComplete(nil) { //FIXME: which context to pass ?
+ 			a.connPool.remove(conn)
+--- /dev/null
++++ b/reassembly/retention_candidate_test.go
+@@ -0,0 +1,208 @@
++package reassembly
++
++import (
++	"testing"
++	"time"
++
++	"github.com/google/gopacket"
++	"github.com/google/gopacket/layers"
++)
++
++// These tests use only synthetic TCP packets and this package's in-memory pool.
++// They neither open network sockets nor invoke OpenGFW/NFQUEUE.
++type candidateRetentionFactory struct {
++	streams []*candidateRetentionStream
++}
++
++type candidateRetentionStream struct {
++	accept    bool
++	completed int
++	replayed  int
++}
++
++func (f *candidateRetentionFactory) New(_, _ gopacket.Flow, _ *layers.TCP, _ AssemblerContext) Stream {
++	s := &candidateRetentionStream{accept: true}
++	f.streams = append(f.streams, s)
++	return s
++}
++
++func (s *candidateRetentionStream) Accept(_ *layers.TCP, _ gopacket.CaptureInfo, _ TCPFlowDirection, _ Sequence, _ *bool, _ AssemblerContext) bool {
++	return s.accept
++}
++
++func (s *candidateRetentionStream) ReassembledSG(_ ScatterGather, _ AssemblerContext) {
++	s.replayed++
++}
++
++func (s *candidateRetentionStream) ReassemblyComplete(_ AssemblerContext) bool {
++	s.completed++
++	return true
++}
++
++func candidatePacket(port layers.TCPPort, seq uint32, syn, fin, rst bool, data []byte) *layers.TCP {
++	p := &layers.TCP{
++		SrcPort: port, DstPort: 443, Seq: seq,
++		SYN: syn, FIN: fin, RST: rst,
++		BaseLayer: layers.BaseLayer{Payload: data},
++	}
++	p.SetInternalPortsForTesting()
++	return p
++}
++
++func candidateAssemble(a *Assembler, p *layers.TCP, ts time.Time) {
++	ctx := assemblerSimpleContext(gopacket.CaptureInfo{Timestamp: ts})
++	a.AssembleWithContext(netFlow, p, &ctx)
++}
++
++func candidateAssertFreeStreamsCleared(t *testing.T, p *StreamPool) {
++	t.Helper()
++	for i, c := range p.free {
++		if c.c2s.stream != nil || c.s2c.stream != nil {
++			t.Fatalf("free connection %d retains a completed stream", i)
++		}
++	}
++	// all retains every allocated connection independently of free.
++	for _, block := range p.all {
++		for i := range block {
++			c := &block[i]
++			if _, active := p.conns[c.key]; !active && (c.c2s.stream != nil || c.s2c.stream != nil) {
++				t.Fatal("inactive connection in all retains a completed stream")
++			}
++		}
++	}
++}
++
++func TestCandidateTTLReleasesOldButRetainsFreshAndBoundary(t *testing.T) {
++	f := &candidateRetentionFactory{}
++	p := NewStreamPool(f)
++	a := NewAssembler(p)
++	now := time.Unix(1700000000, 0)
++	cutoff := now.Add(-120 * time.Second)
++	old := cutoff.Add(-time.Second)
++	for _, port := range []layers.TCPPort{10001, 10002, 10003} {
++		candidateAssemble(a, candidatePacket(port, 1000, true, false, false, nil), old)
++	}
++	// Model a final verdict: Accept=false prevents FIN/RST processing, but
++	// lastSeen must still protect a stream if one direction was seen recently.
++	for _, s := range f.streams {
++		s.accept = false
++	}
++	candidateAssemble(a, candidatePacket(10002, 1001, false, false, false, []byte("fresh")), now)
++	candidateAssemble(a, candidatePacket(10003, 1001, false, false, false, []byte("boundary")), cutoff)
++	a.FlushCloseOlderThan(cutoff)
++	if len(p.conns) != 2 || f.streams[0].completed != 1 {
++		t.Fatalf("old/fresh classification: pool=%d oldCompleted=%d", len(p.conns), f.streams[0].completed)
++	}
++	for _, s := range f.streams[1:] {
++		if s.completed != 0 {
++			t.Fatal("fresh or exact-cutoff connection was closed")
++		}
++	}
++	candidateAssertFreeStreamsCleared(t, p)
++	a.FlushAll()
++	a.FlushAll()
++	a.FlushCloseOlderThan(now)
++	if len(p.conns) != 0 {
++		t.Fatalf("remaining connections after shutdown: %d", len(p.conns))
++	}
++	for _, s := range f.streams {
++		if s.completed != 1 {
++			t.Fatalf("completion callback count=%d, want 1", s.completed)
++		}
++	}
++	candidateAssertFreeStreamsCleared(t, p)
++}
++
++func TestCandidateCloseReleasesAllThreeQueuedPages(t *testing.T) {
++	f := &candidateRetentionFactory{}
++	p := NewStreamPool(f)
++	a := NewAssembler(p)
++	packet := candidatePacket(11001, 1000, true, false, false, nil)
++	candidateAssemble(a, packet, time.Unix(1700000000, 0))
++	c, half, reverse := p.getHalf(key{netFlow, packet.TransportFlow()})
++	reverse.closed = true
++	var previous *page
++	for i := 0; i < 3; i++ {
++		q := a.pc.next(time.Unix(1700000000, 0))
++		q.prev = previous
++		if previous == nil {
++			half.first = q
++		} else {
++			previous.next = q
++		}
++		previous = q
++		half.last = q
++		half.pages++
++	}
++	c.mu.Lock()
++	a.closeHalfConnection(c, half)
++	c.mu.Unlock()
++	if a.pc.used != 0 || half.pages != 0 || half.first != nil || half.last != nil {
++		t.Fatalf("queued page leak: cache=%d half=%d first=%p last=%p", a.pc.used, half.pages, half.first, half.last)
++	}
++	if len(p.conns) != 0 || f.streams[0].completed != 1 {
++		t.Fatalf("close state: pool=%d completions=%d", len(p.conns), f.streams[0].completed)
++	}
++	a.FlushAll()
++	if f.streams[0].completed != 1 || a.pc.used != 0 {
++		t.Fatal("repeated flush released pages or completed the stream twice")
++	}
++	candidateAssertFreeStreamsCleared(t, p)
++}
++
++func TestCandidateFINAndRSTReleaseQueuedGaps(t *testing.T) {
++	for _, mode := range []string{"FIN", "RST"} {
++		t.Run(mode, func(t *testing.T) {
++			f := &candidateRetentionFactory{}
++			p := NewStreamPool(f)
++			a := NewAssembler(p)
++			ts := time.Unix(1700000000, 0)
++			packet := candidatePacket(12001, 1000, true, false, false, nil)
++			candidateAssemble(a, packet, ts)
++			for _, seq := range []uint32{2000, 3000, 4000} {
++				candidateAssemble(a, candidatePacket(12001, seq, false, false, false, []byte("x")), ts)
++			}
++			_, half, _ := p.getHalf(key{netFlow, packet.TransportFlow()})
++			if half.pages != 3 || a.pc.used != 3 {
++				t.Fatalf("test setup did not queue three gaps: pages=%d cache=%d", half.pages, a.pc.used)
++			}
++			candidateAssemble(a, candidatePacket(12001, 1001, false, mode == "FIN", mode == "RST", nil), ts)
++			if !half.closed || half.pages != 0 || a.pc.used != 0 || half.first != nil || half.last != nil {
++				t.Fatalf("%s left queued pages: closed=%v half=%d cache=%d", mode, half.closed, half.pages, a.pc.used)
++			}
++			a.FlushAll()
++			a.FlushAll()
++			if len(p.conns) != 0 || f.streams[0].completed != 1 {
++				t.Fatalf("post-%s flush: pool=%d completions=%d", mode, len(p.conns), f.streams[0].completed)
++			}
++			candidateAssertFreeStreamsCleared(t, p)
++		})
++	}
++}
++
++func TestCandidateBatchReclaimAndPoolReuse(t *testing.T) {
++	f := &candidateRetentionFactory{}
++	p := NewStreamPool(f)
++	a := NewAssembler(p)
++	old := time.Unix(1700000000, 0)
++	for generation := 0; generation < 2; generation++ {
++		for i := 0; i < 1000; i++ {
++			candidateAssemble(a, candidatePacket(layers.TCPPort(20000+i), 1000, true, false, false, nil), old)
++			f.streams[len(f.streams)-1].accept = false
++		}
++		if len(p.conns) != 1000 {
++			t.Fatalf("generation %d setup: pool=%d", generation, len(p.conns))
++		}
++		a.FlushCloseOlderThan(old.Add(time.Second))
++		a.FlushAll()
++		if len(p.conns) != 0 || a.pc.used != 0 {
++			t.Fatalf("generation %d leak: pool=%d pages=%d", generation, len(p.conns), a.pc.used)
++		}
++		candidateAssertFreeStreamsCleared(t, p)
++	}
++	for _, s := range f.streams {
++		if s.completed != 1 {
++			t.Fatalf("completion callback count after pool reuse=%d", s.completed)
++		}
++	}
++}

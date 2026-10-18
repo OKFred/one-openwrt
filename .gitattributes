@@ -1,0 +1,7 @@
+tools/og/build.sh text eol=lf
+tools/og/patches/*.patch text eol=lf -whitespace
+tools/og/THIRD_PARTY_LICENSES.txt text eol=lf -whitespace
+tools/og/og.sha256 text eol=lf
+tools/og/build-info.json text eol=lf
+tools/og/og binary
+tools/og/source/*.zip binary
